@@ -7,7 +7,7 @@ from pynput import mouse
 class Mouse_monitoring_service (threading.Thread):
 	def __init__(self):
 		# set member variables
-		self.m_listener = mouse.Listener(on_click = self.on_click)
+		self.m_listener = mouse.Listener(on_click = self.on_click, on_move=self.on_move)
 		self.log = []
 		
 		# init base class
@@ -27,6 +27,9 @@ class Mouse_monitoring_service (threading.Thread):
 
 	def on_click(self, x, y, button, pressed):
 		self.log.append([x, y, button, pressed])
+		
+	def on_move(self, x, y):
+		self.log.append([x, y, None, None])
 	
 	def clear_log(self):
 		self.log = []
