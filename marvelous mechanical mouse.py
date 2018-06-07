@@ -1,5 +1,7 @@
-from mouse_monitoring_service import Mouse_monitoring_service
-from mouse_controller import Mouse_controller
+# from mouse_monitoring_service import Mouse_monitoring_service
+from input_monitoring_service import Input_monitoring_service
+from output_controller import Output_controller
+from action_factory import Action_factory as af
 
 import threading
 import tkinter as tk
@@ -23,24 +25,30 @@ class Main_window (tk.Frame):
 		
 		# data
 		self.log = []
-		self.motion_speed = .001
+		self.motion_speed = 1.0
 		self.motion_variance = .03
-		self.click_speed = 0.1
+		self.click_speed = 1.0
 		self.click_variance = .1
-		self.monitoring_service = Mouse_monitoring_service()
+		self.run_frequency = 5
+		self.timer = threading.Timer(self.run_frequency, self.run_macro)
+		self.monitoring_service = Input_monitoring_service()
 		
 		# UI elements
 		self.logstring = tk.StringVar()
-		self.log_box = tk.Listbox(self, listvariable = self.logstring, width=58)
-		self.log_box.grid(column=0, row=0, columnspan=5)
+		self.log_box = tk.Listbox(self, listvariable = self.logstring, width=64)
+		self.log_box.grid(column=0, row=0, columnspan=6)
 		
 		# settings
 		#labels
-		self.speed_label = tk.Label(self, text="speed (s)")
+		self.speed_label = tk.Label(self, text="speed (x)")
 		self.speed_label.grid(row=1, column=1)
 		
 		self.variance_label = tk.Label(self, text="variance (s)")
 		self.variance_label.grid(row=1, column=2)
+		
+		
+		self.run_frequency_label = tk.Label(self, text="run frequency (s)")
+		self.run_frequency_label.grid(row=1, column=3, columnspan=2)
 		
 		self.motion_label = tk.Label(self, text="motion")
 		self.motion_label.grid(row=2, column=0)
@@ -69,6 +77,11 @@ class Main_window (tk.Frame):
 		self.click_variance_textbox = tk.Entry(self, width=6, textvariable=self.click_variance_textbox_text)
 		self.click_variance_textbox.grid(row=3, column=2)
 		
+		self.run_frequency_textbox_text = tk.StringVar()
+		self.run_frequency_textbox_text.set(str(self.run_frequency))
+		self.run_frequency_textbox = tk.Entry(self, width=4, textvariable=self.run_frequency_textbox_text)
+		self.run_frequency_textbox.grid(row=2, column=4)
+		
 		# buttons
 		self.start_button = tk.Button(self, text="start recording", command=self.start_recording)
 		self.start_button.grid(column=0, row=4)
@@ -82,12 +95,18 @@ class Main_window (tk.Frame):
 		self.run_button = tk.Button(self, text="run once", command=self.run_macro)
 		self.run_button.grid(column=3, row=4)
 		
-		self.quit_button = tk.Button(self, text="quit", command=self.quit)
-		self.quit_button.grid(column=4, row=4)
+		self.run_continually_button = tk.Button(self, text="start", command=self.run_macro_continually)
+		self.run_continually_button.grid(column=4, row=4)
+		
+		self.stop_button = tk.Button(self, text="stop", command=self.stop)
+		self.stop_button.grid(column=5, row=4)
 	
 	def start_recording(self):
-		self.monitoring_service = Mouse_monitoring_service()
+		self.monitoring_service = Input_monitoring_service()
 		self.monitoring_service.start()
+		
+		# self.monitoring_service = Mouse_monitoring_service()
+		# self.monitoring_service.start()
 		
 	def stop_recording(self):
 		self.monitoring_service.stop()
@@ -105,32 +124,27 @@ class Main_window (tk.Frame):
 		self.update_click_speed()
 		self.update_click_variance()
 		
-		mouse_controller_thread = Mouse_controller(self.log, self.motion_speed, self.motion_variance, self.click_speed, self.click_variance)
-		mouse_controller_thread.start()
-		mouse_controller_thread.join()
+		controller_thread = Output_controller(self.log, self.motion_speed, self.motion_variance, self.click_speed, self.click_variance)
+		controller_thread.start()
+		controller_thread.join()
+	
+	def run_macro_continually(self):
+		self.update_run_frequency()
+		self.start_timer()
+		print("started")
 		
-	def quit(self):
-		exit()
+	def stop(self):
+		self.timer.cancel()
+		print("stopped")
 	
 	def run(self):
 		self.pack()
 		self.mainloop()
 		
 	# utility functions
-	def parse_log(self, log):
-		action_list = []
-		for i in range(0, len(log)-2):
-			if log[i][3] == True or log[i][3] == None: # only record one click action from the two records of it
-				new_record = {}
-				new_record["x"] = log[i][0]
-				new_record["y"] = log[i][1]
-				new_record["action"] = log[i][2]
-				
-				action_list.append(new_record)
-		return action_list
 	
 	def update_log(self):
-		self.log += self.parse_log(self.monitoring_service.log)
+		self.log += af.parse_log(self.monitoring_service.log)
 	
 	def clear_log(self):
 		self.log = []
@@ -149,9 +163,21 @@ class Main_window (tk.Frame):
 	
 	def update_click_variance(self):
 		self.click_variance = float(self.click_variance_textbox_text.get())
+		
+	def update_run_frequency(self):
+		self.run_frequency = float(self.run_frequency_textbox_text.get())
+		
+	# timer functions
+	def start_timer(self):
+		self.timer = threading.Timer(self.run_frequency, self.tick)
+		self.timer.start()
+		
+	def tick(self):
+		self.run_macro()
+		self.start_timer()
+		
 
 if __name__ == "__main__":
-	
 	# start main loop execution, using keyboard monitoring to parse commands
 	ui = application_interface()
 	ui.run()
