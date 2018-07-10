@@ -1,2 +1,2 @@
 cd ./Marvelous-Mechanical-Mouse
-python3 main.py
+python3 Marvelous-Mechanical-Mouse.py
